@@ -61,6 +61,9 @@ def play():
     COOLDOWN_POWERUP = pygame.image.load(os.path.join("assets/zegareczek_small.png"))
     RESTORE_POWERUP = pygame.image.load(os.path.join("assets/serduszko_small.png"))
 
+    # Boss
+    BOSS_ALIEN = pygame.image.load((os.path.join("assets/boss_small.png")))
+
     # Load images
     RED_SPACE_SHIP = pygame.image.load(os.path.join("assets", "pink-alien1.png"))
     GREEN_SPACE_SHIP = pygame.image.load(os.path.join("assets", "green-alien1.png"))
@@ -259,6 +262,44 @@ def play():
         offset_y = obj2.y - obj1.y
         return obj1.mask.overlap(obj2.mask, (offset_x, offset_y)) is not None
 
+    class Boss(Ship):
+        def __init__(self, x, y, health=100):
+            self.x = x
+            self.y = y
+            self.health = health
+            self.ship_img = None
+            self.laser_img = None
+            self.lasers = []
+            self.cool_down_counter = 0
+
+        def draw(self, window):
+            window.blit(self.ship_img, (self.x, self.y))
+            for laser in self.lasers:
+                laser.draw(window)
+
+        def move_lasers(self, vel, obj):
+            self.cooldown()
+            for laser in self.lasers:
+                laser.move(vel)
+                if laser.off_screen(HEIGHT):
+                    self.lasers.remove(laser)
+                elif laser.collision(obj):
+                    obj.health -= 10
+                    self.lasers.remove(laser)
+
+        def cooldown(self):
+            if self.cool_down_counter >= self.COOLDOWN:
+                self.cool_down_counter = 0
+            elif self.cool_down_counter > 0:
+                self.cool_down_counter += 1
+
+        def shoot(self):
+            if self.cool_down_counter == 0:
+                laser = Laser(self.x, self.y - 40, self.laser_img)
+                self.lasers.append(laser)
+                self.cool_down_counter = 1
+
+
     def main():
         global lost_counter
         run = True
@@ -380,10 +421,6 @@ def play():
                     powerups.remove(powerup)
 
             player.move_lasers(-laser_vel, enemies, powerups)
-
-
-
-
 
     main()
 
