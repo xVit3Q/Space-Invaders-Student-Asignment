@@ -28,15 +28,11 @@ lost_counter = 0
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 
-# Function to save options to a file
-
 
 def save_options(volume, difficulty):
     options = {'volume': volume, 'difficulty': difficulty}
     with open('options.pkl', 'wb') as f:
         pickle.dump(options, f)
-
-# Function to load options from a file
 
 
 def load_options():
@@ -56,10 +52,13 @@ def play():
     global lost_counter
 
     # Powerups
-    SPEED_POWERUP = pygame.image.load(os.path.join("assets/szybkosc_small.png"))
-    UPGRADE_POWERUP = pygame.image.load(os.path.join("assets/gwiazdeczka_small.png"))
-    COOLDOWN_POWERUP = pygame.image.load(os.path.join("assets/zegareczek_small.png"))
-    RESTORE_POWERUP = pygame.image.load(os.path.join("assets/serduszko_small.png"))
+    SPEED_POWERUP = pygame.image.load(os.path.join("assets", "szybkosc_small.png"))
+    UPGRADE_POWERUP = pygame.image.load(os.path.join("assets", "gwiazdeczka_small.png"))
+    COOLDOWN_POWERUP = pygame.image.load(os.path.join("assets", "zegareczek_small.png"))
+    RESTORE_POWERUP = pygame.image.load(os.path.join("assets", "serduszko_small.png"))
+
+    # Boss
+    BOSS_ALIEN = pygame.image.load(os.path.join("assets", "boss_small.png"))
 
     # Load images
     RED_SPACE_SHIP = pygame.image.load(os.path.join("assets", "pink-alien1.png"))
@@ -68,7 +67,7 @@ def play():
 
     # Player
     YELLOW_SPACE_SHIP = pygame.image.load(os.path.join("assets", "ship2.png"))
-    BETTER_SPACE_SHIP2 = pygame.image.load((os.path.join("assets/ship1.png")))
+    BETTER_SPACE_SHIP2 = pygame.image.load(os.path.join("assets", "ship1.png"))
 
     # Lasers
     RED_LASER = pygame.image.load(os.path.join("assets", "pixel_laser_red.png"))
@@ -78,12 +77,12 @@ def play():
 
     # Health
     health_image = {
-        5: pygame.image.load(os.path.join('assets/SpaceInvaders_Health1.3.png')),
-        4: pygame.image.load(os.path.join('assets/SpaceInvaders_Health2.3.png')),
-        3: pygame.image.load(os.path.join('assets/SpaceInvaders_Health3.3.png')),
-        2: pygame.image.load(os.path.join('assets/SpaceInvaders_Health4.3.png')),
-        1: pygame.image.load(os.path.join('assets/SpaceInvaders_Health5.3.png')),
-        0: pygame.image.load(os.path.join('assets/SpaceInvaders_Health6.3.png'))
+        5: pygame.image.load(os.path.join('assets', 'SpaceInvaders_Health1.3.png')),
+        4: pygame.image.load(os.path.join('assets', 'SpaceInvaders_Health2.3.png')),
+        3: pygame.image.load(os.path.join('assets', 'SpaceInvaders_Health3.3.png')),
+        2: pygame.image.load(os.path.join('assets', 'SpaceInvaders_Health4.3.png')),
+        1: pygame.image.load(os.path.join('assets', 'SpaceInvaders_Health5.3.png')),
+        0: pygame.image.load(os.path.join('assets', 'SpaceInvaders_Health6.3.png'))
     }
 
     def display_lives(num_lives):
@@ -169,7 +168,7 @@ def play():
         def ship_upgrade(self):
             self.ship_img = BETTER_SPACE_SHIP2
 
-        def move_lasers(self, vel, objs, powerups):  # Add objs and powerups parameters
+        def move_lasers(self, vel, objs, boss, powerups):  # Add objs and powerups parameters
             self.cooldown()
             for laser in self.lasers[:]:  # Iterate over a copy of self.lasers
                 laser.move(vel)
@@ -183,6 +182,10 @@ def play():
                                 self.lasers.remove(laser)
                             if obj in objs:
                                 objs.remove(obj)
+                    if boss and laser.collision(boss):
+                        boss.health -= 10
+                        if laser in self.lasers:
+                            self.lasers.remove(laser)
 
         def health_bar(self, window):
             pygame.draw.rect(window, (255, 0, 0),
@@ -219,92 +222,127 @@ def play():
 
         def delete(self, powerups):
             chance = random.random()
-            if chance < 0.50:
+            if chance < 0.30:
                 powerup_type = random.choice(['heart', 'cooldown', 'upgrade', 'speedup'])
                 powerup = PowerUp(self.x, self.y, powerup_type)
                 powerups.append(powerup)
 
-    class PowerUp:
-        POWER_MAP = {
-            "heart": RESTORE_POWERUP,
-            "cooldown": COOLDOWN_POWERUP,
-            "upgrade": UPGRADE_POWERUP,
-            "speedup": SPEED_POWERUP
-        }
+    class Boss(Ship):
+        def __init__(self, x, y, health=1000):
+            super().__init__(x, y, health)
+            self.ship_img = BOSS_ALIEN
+            self.laser_img = RED_LASER
+            self.mask = pygame.mask.from_surface(self.ship_img)
+            self.max_health = health
+            self.direction = 1  # Boss moves horizontally initially
 
+        def move(self, vel):
+            self.x += vel * self.direction
+            if self.x <= 0 or self.x + self.get_width() >= WIDTH:
+                self.direction *= -1  # Reverse direction if it hits screen edge
+
+        def shoot(self):
+            if self.cool_down_counter == 0:
+                laser = Laser(self.x + self.get_width() // 2 - self.laser_img.get_width() // 2,
+                              self.y + self.get_height(), self.laser_img)
+                self.lasers.append(laser)
+                self.cool_down_counter = 1
+
+        def health_bar(self, window):
+            pygame.draw.rect(window, (255, 0, 0),
+                             (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width(), 10))
+            pygame.draw.rect(window, (0, 255, 0),
+                             (self.x, self.y + self.ship_img.get_height() + 10,
+                              self.ship_img.get_width() * (1 - ((self.max_health - self.health) / self.max_health)),
+                              10))
+
+        def draw(self, window):
+            super().draw(window)
+            self.health_bar(window)
+
+    class PowerUp:
         def __init__(self, x, y, powerup_type):
             self.x = x
             self.y = y
             self.type = powerup_type
-            try:
-                self.power_img = self.POWER_MAP[powerup_type]
-            except KeyError:
-                raise ValueError(f"Invalid powerup type: {powerup_type}")
-            self.mask = pygame.mask.from_surface(self.power_img)
+            self.images = {
+                'speedup': SPEED_POWERUP,
+                'upgrade': UPGRADE_POWERUP,
+                'cooldown': COOLDOWN_POWERUP,
+                'heart': RESTORE_POWERUP
+            }
+            self.image = self.images[powerup_type]
+            self.mask = pygame.mask.from_surface(self.image)
 
         def draw(self, window):
-            window.blit(self.power_img, (self.x, self.y))
+            window.blit(self.image, (self.x, self.y))
 
         def move(self, vel):
             self.y += vel
 
         def off_screen(self, height):
-            return self.y > height
+            return not (height >= self.y >= 0)
 
         def collision(self, obj):
             return collide(self, obj)
 
     def collide(obj1, obj2):
-        offset_x = obj2.x - obj1.x
-        offset_y = obj2.y - obj1.y
+        offset_x = int(obj2.x - obj1.x)
+        offset_y = int(obj2.y - obj1.y)
         return obj1.mask.overlap(obj2.mask, (offset_x, offset_y)) is not None
 
     def main():
         global lost_counter
         run = True
         FPS = 60
-        level = 0
+        level = 8
         lives = 5
 
         main_font = pygame.font.SysFont("comicsans", 30)
         lost_font = pygame.font.SysFont("comicsans", 60)
+        win_font = pygame.font.SysFont("comicsans", 60)
 
         enemies = []
         powerups = []
-        wave_length = 5
-        enemy_vel = 2
+        wave_length = 3
+        enemy_vel = 1
         player_vel = 5
         laser_vel = 5
         powerup_vel = 1
 
         player = Player(WIDTH / 2, 630)
+        boss = None
         evolve = 0
         clock = pygame.time.Clock()
 
         lost = False
+        won = False
         lost_count = 0
 
         def redraw_window():
             WIN.blit(BG, (0, 0))
-            # draw text
             lives_label = main_font.render("Lives: ", 1, (255, 255, 255))
             display_lives(lives)
-            if level == 1:
-                level_label = main_font.render("Boss Level", 1, (255, 255, 255))
-            else:
-                level_label = main_font.render(f"Level: {level}", 1, (255, 255, 255))
-
+            level_label = main_font.render(f"Level: {level}" if level != 10 else "Boss Level", 1, (255, 255, 255))
             WIN.blit(lives_label, (0, 0))
             WIN.blit(level_label, (WIDTH - level_label.get_width() - 10, 10))
 
             player.draw(WIN)
+
+            if boss:
+                boss.draw(WIN)
+
             for enemy in enemies:
                 enemy.draw(WIN)
             for powerup in powerups:
                 powerup.draw(WIN)
+
             if lost:
                 lost_label = lost_font.render("You Lost!!", 1, (255, 255, 255))
                 WIN.blit(lost_label, (WIDTH / 2 - lost_label.get_width() / 2, 350))
+            if level > 10:
+                win_label = win_font.render("You Won!!", 1, (255, 255, 255))
+                WIN.blit(win_label, (WIDTH / 2 - win_label.get_width() / 2, 350))
 
             pygame.display.update()
 
@@ -316,22 +354,23 @@ def play():
                 lost = True
                 lost_count += 1
 
-            if lost:
+            if lost or won:
                 lost_counter += 1
                 if lost_count > FPS * 3:
-
                     run = False
-
                 else:
                     continue
 
-            if len(enemies) == 0:
+            if len(enemies) == 0 and not boss:
                 level += 1
                 wave_length += 5
-                for i in range(wave_length):
-                    enemy = Enemy(random.randrange(50, WIDTH - 100), random.randrange(-1500, -100),
-                                  random.choice(["red", "blue", "green"]))
-                    enemies.append(enemy)
+                if level == 10:
+                    boss = Boss(WIDTH / 2 - BOSS_ALIEN.get_width() // 2, 100)
+                else:
+                    for i in range(wave_length):
+                        enemy = Enemy(random.randrange(50, WIDTH - 100), random.randrange(-1500, -100),
+                                      random.choice(["red", "blue", "green"]))
+                        enemies.append(enemy)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -362,6 +401,21 @@ def play():
                 elif enemy.y + enemy.get_height() > HEIGHT:
                     lives -= 1
                     enemies.remove(enemy)
+
+            if boss:  # Handle boss movement and shooting
+                boss.move(enemy_vel)
+                boss.move_lasers(laser_vel, player)
+
+                if random.randrange(1, 2 * 30) == 1:
+                    boss.shoot()
+
+                if collide(boss, player):
+                    player.health -= 10
+
+                if boss.health <= 0:  # Remove the boss if its health is depleted
+                    boss = None
+                    won = True
+
             for powerup in powerups[:]:
                 powerup.move(powerup_vel)
                 if powerup.off_screen(HEIGHT):
@@ -379,17 +433,12 @@ def play():
                             player.ship_upgrade()
                     powerups.remove(powerup)
 
-            player.move_lasers(-laser_vel, enemies, powerups)
-
-
-
-
+            player.move_lasers(-laser_vel, enemies, boss, powerups)
 
     main()
-
-
+    
+    
 def options():
-
     def display_difficulty_label(window, difficulty, x, y):
         difficulty_label_font = get_font(30)
         difficulty_levels = {
