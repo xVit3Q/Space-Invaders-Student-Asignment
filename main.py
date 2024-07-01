@@ -352,7 +352,7 @@ def play():
         global lost_counter
         run = True
         FPS = 60
-        level = 9
+        level = 0
         lives = 5
 
         main_font = pygame.font.SysFont("comicsans", 30)
