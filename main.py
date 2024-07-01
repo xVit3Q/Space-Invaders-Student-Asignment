@@ -377,6 +377,7 @@ def play():
         lost = False
         won = False
         lost_count = 0
+        win_count = 0
 
         def redraw_window():
             WIN.blit(BG, (0, 0))
@@ -399,7 +400,7 @@ def play():
             if lost:
                 lost_label = lost_font.render("You Lost!!", 1, (255, 255, 255))
                 WIN.blit(lost_label, (WIDTH / 2 - lost_label.get_width() / 2, 350))
-            if level > 10:
+            if won:
                 win_label = win_font.render("You Won!!", 1, (255, 255, 255))
                 WIN.blit(win_label, (WIDTH / 2 - win_label.get_width() / 2, 350))
 
@@ -413,7 +414,7 @@ def play():
                 lost = True
                 lost_count += 1
 
-            if lost or won:
+            if lost:
                 lost_counter += 1
                 if lost_count > FPS * 3:
                     run = False
@@ -492,6 +493,14 @@ def play():
                     powerups.remove(powerup)
 
             player.move_lasers(-laser_vel, enemies, boss, powerups)
+
+            if won:
+                win_count += 1
+                if win_count > FPS * 3:  # Adjust this duration as needed
+                    lost_counter += 1
+                    run = False
+                else:
+                    continue
 
     main()
 
