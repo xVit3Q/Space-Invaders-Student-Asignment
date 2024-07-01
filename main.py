@@ -7,7 +7,6 @@ from slider import Slider
 import pickle
 
 pygame.init()
-
 pygame.font.init()
 
 WIDTH, HEIGHT = 1280, 720
@@ -48,8 +47,66 @@ def get_font(size):
     return pygame.font.Font("assets/font.ttf", size)
 
 
+DIFFICULTY_LEVELS = {
+    1: {
+        'wave_length': 5,
+        'enemy_vel': 1,
+        'player_vel': 5,
+        'laser_vel': 5,
+        'boss_health': 500,
+        'player_max_health': 100,
+        'boss_vel': 5
+
+    },
+    2: {
+        'wave_length': 5,
+        'enemy_vel': 1.5,
+        'player_vel': 5,
+        'laser_vel': 6,
+        'boss_health': 1000,
+        'player_max_health': 90,
+        'boss_vel': 5
+
+    },
+    3: {
+        'wave_length': 5,
+        'enemy_vel': 1.5,
+        'player_vel': 5,
+        'laser_vel': 7,
+        'boss_health': 1500,
+        'player_max_health': 80,
+        'boss_vel': 6
+
+    },
+    4: {
+        'wave_length': 5,
+        'enemy_vel': 1.5,
+        'player_vel': 5,
+        'laser_vel': 7,
+        'boss_health': 2000,
+        'player_max_health': 80,
+        'boss_vel': 6
+    },
+    5:  {
+        'wave_length': 5,
+        'enemy_vel': 1.5,
+        'player_vel': 5,
+        'laser_vel': 5,
+        'boss_health': 3000,
+        'player_max_health': 20,
+        'boss_vel': 7
+    }
+}
+
+
 def play():
     global lost_counter
+    global difficulty
+
+    volume, difficulty = load_options()
+    parameters = DIFFICULTY_LEVELS.get(difficulty, DIFFICULTY_LEVELS[1])
+
+    print(f"Current difficulty: {difficulty}")
 
     # Powerups
     SPEED_POWERUP = pygame.image.load(os.path.join("assets", "szybkosc_small.png"))
@@ -157,12 +214,12 @@ def play():
             return self.ship_img.get_height()
 
     class Player(Ship):
-        def __init__(self, x, y, health=100):
+        def __init__(self, x, y, health=parameters['player_max_health']):
             super().__init__(x, y, health)
             self.ship_img = YELLOW_SPACE_SHIP
             self.laser_img = YELLOW_LASER
             self.mask = pygame.mask.from_surface(self.ship_img)
-            self.max_health = health
+            self.max_health = parameters['player_max_health']
             self.evolve = 0
 
         def ship_upgrade(self):
@@ -228,7 +285,7 @@ def play():
                 powerups.append(powerup)
 
     class Boss(Ship):
-        def __init__(self, x, y, health=1000):
+        def __init__(self, x, y, health=parameters['boss_health']):
             super().__init__(x, y, health)
             self.ship_img = BOSS_ALIEN
             self.laser_img = RED_LASER
@@ -295,7 +352,7 @@ def play():
         global lost_counter
         run = True
         FPS = 60
-        level = 0
+        level = 9
         lives = 5
 
         main_font = pygame.font.SysFont("comicsans", 30)
@@ -304,15 +361,17 @@ def play():
 
         enemies = []
         powerups = []
-        wave_length = 3
-        enemy_vel = 1
-        player_vel = 5
-        laser_vel = 5
+
+        wave_length = parameters['wave_length']
+        enemy_vel = parameters['enemy_vel']
+        player_vel = parameters['player_vel']
+        laser_vel = parameters['laser_vel']
+        evolve = 0
         powerup_vel = 1
 
         player = Player(WIDTH / 2, 630)
         boss = None
-        evolve = 0
+
         clock = pygame.time.Clock()
 
         lost = False
@@ -403,9 +462,8 @@ def play():
                     enemies.remove(enemy)
 
             if boss:  # Handle boss movement and shooting
-                boss.move(enemy_vel)
+                boss.move(parameters["boss_vel"])
                 boss.move_lasers(laser_vel, player)
-
                 if random.randrange(1, 2 * 30) == 1:
                     boss.shoot()
 
@@ -436,8 +494,8 @@ def play():
             player.move_lasers(-laser_vel, enemies, boss, powerups)
 
     main()
-    
-    
+
+
 def options():
     def display_difficulty_label(window, difficulty, x, y):
         difficulty_label_font = get_font(30)
