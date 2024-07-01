@@ -27,6 +27,10 @@ lost_counter = 0
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 
+score = 0
+high_score = 0
+previous_score = 0
+
 
 def save_options(volume, difficulty):
     options = {'volume': volume, 'difficulty': difficulty}
@@ -41,6 +45,21 @@ def load_options():
         return options.get('volume', 50), options.get('difficulty', 3)  # Default values if file doesn't exist
     except FileNotFoundError:
         return 50, 3
+
+
+def save_scores(score, high_score, previous_score):
+    scores = {'score': score, 'high_score': high_score, 'previous_score': previous_score}
+    with open('scores.pkl', 'wb') as f:
+        pickle.dump(scores, f)
+
+
+def load_scores():
+    try:
+        with open('scores.pkl', 'rb') as f:
+            scores = pickle.load(f)
+        return scores.get('score', 0), scores.get('high_score', 0), scores.get('previous_score', 0)
+    except FileNotFoundError:
+        return 0, 0, 0
 
 
 def get_font(size):
@@ -66,7 +85,7 @@ DIFFICULTY_LEVELS = {
         'laser_vel': 6,
         'boss_health': 1000,
         'player_max_health': 90,
-        'special_bullet_vel': 60,
+        'special_bullet_vel': 8,
         'boss_vel': 5
 
     },
@@ -77,7 +96,7 @@ DIFFICULTY_LEVELS = {
         'laser_vel': 7,
         'boss_health': 1500,
         'player_max_health': 80,
-        'special_bullet_vel': 60,
+        'special_bullet_vel': 9,
         'boss_vel': 6
 
     },
@@ -88,7 +107,7 @@ DIFFICULTY_LEVELS = {
         'laser_vel': 7,
         'boss_health': 2000,
         'player_max_health': 80,
-        'special_bullet_vel': 60,
+        'special_bullet_vel': 10,
         'boss_vel': 6
     },
     5:  {
@@ -98,7 +117,7 @@ DIFFICULTY_LEVELS = {
         'laser_vel': 5,
         'boss_health': 3000,
         'player_max_health': 20,
-        'special_bullet_vel': 60,
+        'special_bullet_vel': 15,
         'boss_vel': 7
     }
 }
@@ -108,6 +127,7 @@ def play():
     global lost_counter
     global difficulty
 
+    score, high_score, previous_score = load_scores()
     volume, difficulty = load_options()
     parameters = DIFFICULTY_LEVELS.get(difficulty, DIFFICULTY_LEVELS[1])
 
@@ -234,6 +254,7 @@ def play():
                 Player.COOLDOWN -= 4
 
         def move_lasers(self, vel, objs, boss, powerups):  # Add objs and powerups parameters
+            global score
             self.cooldown()
             for laser in self.lasers[:]:  # Iterate over a copy of self.lasers
                 laser.move(vel)
@@ -243,33 +264,24 @@ def play():
                     for obj in objs[:]:  # Iterate over a copy of objs
                         if laser.collision(obj):
                             obj.delete(powerups)
+                            score += 10
                             if laser in self.lasers:
                                 self.lasers.remove(laser)
                             if obj in objs:
                                 objs.remove(obj)
+
                     if boss and laser.collision(boss):
                         boss.health -= 10
                         if laser in self.lasers:
                             self.lasers.remove(laser)
 
         def health_bar(self, window):
-            # Calculate the center position for the health bar
-            bar_width = self.ship_img.get_width()  # Width of the ship image
-            bar_height = 10  # Height of the health bar
-
-            # Calculate the center position for the health bar horizontally
-            bar_x = self.x + (bar_width // 2) - (bar_width // 2)  # Adjust as needed for exact centering
-
-            # Draw the background red bar
             pygame.draw.rect(window, (255, 0, 0),
-                             (bar_x, self.y + self.ship_img.get_height() + 10, bar_width, bar_height))
-
-            # Calculate the width of the green health bar based on current health
-            health_bar_width = bar_width * (self.health / self.max_health)
-
-            # Draw the green health bar
+                             (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width(), 10))
             pygame.draw.rect(window, (0, 255, 0),
-                             (bar_x, self.y + self.ship_img.get_height() + 10, health_bar_width, bar_height))
+                             (self.x, self.y + self.ship_img.get_height() + 10,
+                              self.ship_img.get_width() * (1 - ((self.max_health - self.health) / self.max_health)),
+                              10))
 
         def draw(self, window):
             super().draw(window)
@@ -379,6 +391,8 @@ def play():
 
     def main():
         global lost_counter
+        global score, high_score, previous_score
+        score, high_score, previous_score = load_scores()
         run = True
         FPS = 60
         level = 0
@@ -412,9 +426,11 @@ def play():
             WIN.blit(BG, (0, 0))
             lives_label = main_font.render("Lives: ", 1, (255, 255, 255))
             display_lives(lives)
+            score_label = main_font.render(f"Score: {score}", 1, (255, 255, 255))
+            WIN.blit(score_label, (WIDTH - score_label.get_width() - 10, 0))
             level_label = main_font.render(f"Level: {level}" if level != 10 else "Boss Level", 1, (255, 255, 255))
             WIN.blit(lives_label, (0, 0))
-            WIN.blit(level_label, (WIDTH - level_label.get_width() - 10, 10))
+            WIN.blit(level_label, (WIDTH - level_label.get_width() - 10, 10 + score_label.get_height()))
 
             player.draw(WIN)
 
@@ -429,11 +445,25 @@ def play():
             if lost:
                 lost_label = lost_font.render("You Lost!!", 1, (255, 255, 255))
                 WIN.blit(lost_label, (WIDTH / 2 - lost_label.get_width() / 2, 350))
+                display_scores()
             if won:
                 win_label = win_font.render("You Won!!", 1, (255, 255, 255))
                 WIN.blit(win_label, (WIDTH / 2 - win_label.get_width() / 2, 350))
+                display_scores()
 
             pygame.display.update()
+
+        def display_scores():
+            global score, high_score, previous_score
+
+            score_label = main_font.render(f"Score: {score}", 1, (255, 255, 255))
+            WIN.blit(score_label, (WIDTH / 2 - score_label.get_width() / 2, 450))
+
+            high_score_label = main_font.render(f"High Score: {high_score}", 1, (255, 255, 255))
+            WIN.blit(high_score_label, (WIDTH / 2 - high_score_label.get_width() / 2, 500))
+
+            previous_score_label = main_font.render(f"Previous Score: {previous_score}", 1, (255, 255, 255))
+            WIN.blit(previous_score_label, (WIDTH / 2 - previous_score_label.get_width() / 2, 550))
 
         while run:
             clock.tick(FPS)
@@ -449,6 +479,11 @@ def play():
                 lost_counter += 1
                 if lost_count > FPS * 3:
                     run = False
+                    previous_score = score
+                    if score > high_score:
+                        high_score = score
+                    score = 0
+                    save_scores(score, high_score, previous_score)
                 else:
                     continue
 
@@ -489,6 +524,7 @@ def play():
                 if collide(enemy, player):
                     player.health -= 10
                     enemies.remove(enemy)
+                    score += 10
                 elif enemy.y + enemy.get_height() > HEIGHT:
                     lives -= 1
                     enemies.remove(enemy)
@@ -537,9 +573,19 @@ def play():
 
             if won:
                 win_count += 1
+                previous_score = score
+                if score > high_score:
+                    high_score = score
+                score = 0
+                save_scores(score, high_score, previous_score)
                 if win_count > FPS * 3:  # Adjust this duration as needed
                     lost_counter += 1
                     run = False
+                    previous_score = score
+                    if score > high_score:
+                        high_score = score
+                    score = 0
+                    save_scores(score, high_score, previous_score)
                 else:
                     continue
 
