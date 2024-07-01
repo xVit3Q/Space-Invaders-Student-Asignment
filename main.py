@@ -55,6 +55,7 @@ DIFFICULTY_LEVELS = {
         'laser_vel': 5,
         'boss_health': 500,
         'player_max_health': 100,
+        'special_bullet_vel': 60,
         'boss_vel': 5
 
     },
@@ -65,6 +66,7 @@ DIFFICULTY_LEVELS = {
         'laser_vel': 6,
         'boss_health': 1000,
         'player_max_health': 90,
+        'special_bullet_vel': 60,
         'boss_vel': 5
 
     },
@@ -75,6 +77,7 @@ DIFFICULTY_LEVELS = {
         'laser_vel': 7,
         'boss_health': 1500,
         'player_max_health': 80,
+        'special_bullet_vel': 60,
         'boss_vel': 6
 
     },
@@ -85,6 +88,7 @@ DIFFICULTY_LEVELS = {
         'laser_vel': 7,
         'boss_health': 2000,
         'player_max_health': 80,
+        'special_bullet_vel': 60,
         'boss_vel': 6
     },
     5:  {
@@ -94,6 +98,7 @@ DIFFICULTY_LEVELS = {
         'laser_vel': 5,
         'boss_health': 3000,
         'player_max_health': 20,
+        'special_bullet_vel': 60,
         'boss_vel': 7
     }
 }
@@ -115,7 +120,8 @@ def play():
     RESTORE_POWERUP = pygame.image.load(os.path.join("assets", "serduszko_small.png"))
 
     # Boss
-    BOSS_ALIEN = pygame.image.load(os.path.join("assets", "boss_small.png"))
+    BOSS_ALIEN = pygame.image.load(os.path.join("assets", "boss_ship.png"))
+    BOSS_BULLET = pygame.image.load(os.path.join('assets/boss_bullet.png'))
 
     # Load images
     RED_SPACE_SHIP = pygame.image.load(os.path.join("assets", "pink-alien1.png"))
@@ -123,14 +129,14 @@ def play():
     BLUE_SPACE_SHIP = pygame.image.load(os.path.join("assets", "blue-alien1.png"))
 
     # Player
-    YELLOW_SPACE_SHIP = pygame.image.load(os.path.join("assets", "ship2.png"))
-    BETTER_SPACE_SHIP2 = pygame.image.load(os.path.join("assets", "ship1.png"))
+    YELLOW_SPACE_SHIP = pygame.image.load(os.path.join("assets", "ship1.1.png"))
+    BETTER_SPACE_SHIP2 = pygame.image.load(os.path.join("assets", "ship2.2.png"))
 
     # Lasers
-    RED_LASER = pygame.image.load(os.path.join("assets", "pixel_laser_red.png"))
-    GREEN_LASER = pygame.image.load(os.path.join("assets", "pixel_laser_green.png"))
-    BLUE_LASER = pygame.image.load(os.path.join("assets", "pixel_laser_blue.png"))
-    YELLOW_LASER = pygame.image.load(os.path.join("assets", "pixel_laser_yellow.png"))
+    RED_LASER = pygame.image.load(os.path.join("assets", "red_bullet.png"))
+    GREEN_LASER = pygame.image.load(os.path.join("assets", "green_bullet.png"))
+    BLUE_LASER = pygame.image.load(os.path.join("assets", "blue_bullet.png"))
+    YELLOW_LASER = pygame.image.load(os.path.join("assets", "yellow_bullet.png"))
 
     # Health
     health_image = {
@@ -224,6 +230,8 @@ def play():
 
         def ship_upgrade(self):
             self.ship_img = BETTER_SPACE_SHIP2
+            if Player.COOLDOWN >= 10:
+                Player.COOLDOWN -= 4
 
         def move_lasers(self, vel, objs, boss, powerups):  # Add objs and powerups parameters
             self.cooldown()
@@ -245,12 +253,23 @@ def play():
                             self.lasers.remove(laser)
 
         def health_bar(self, window):
+            # Calculate the center position for the health bar
+            bar_width = self.ship_img.get_width()  # Width of the ship image
+            bar_height = 10  # Height of the health bar
+
+            # Calculate the center position for the health bar horizontally
+            bar_x = self.x + (bar_width // 2) - (bar_width // 2)  # Adjust as needed for exact centering
+
+            # Draw the background red bar
             pygame.draw.rect(window, (255, 0, 0),
-                             (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width(), 10))
+                             (bar_x, self.y + self.ship_img.get_height() + 10, bar_width, bar_height))
+
+            # Calculate the width of the green health bar based on current health
+            health_bar_width = bar_width * (self.health / self.max_health)
+
+            # Draw the green health bar
             pygame.draw.rect(window, (0, 255, 0),
-                             (self.x, self.y + self.ship_img.get_height() + 10,
-                              self.ship_img.get_width() * (1 - ((self.max_health - self.health) / self.max_health)),
-                              10))
+                             (bar_x, self.y + self.ship_img.get_height() + 10, health_bar_width, bar_height))
 
         def draw(self, window):
             super().draw(window)
@@ -289,6 +308,7 @@ def play():
             super().__init__(x, y, health)
             self.ship_img = BOSS_ALIEN
             self.laser_img = RED_LASER
+            self.super_laser_img = BOSS_BULLET
             self.mask = pygame.mask.from_surface(self.ship_img)
             self.max_health = health
             self.direction = 1  # Boss moves horizontally initially
@@ -304,6 +324,15 @@ def play():
                               self.y + self.get_height(), self.laser_img)
                 self.lasers.append(laser)
                 self.cool_down_counter = 1
+
+        def super_shoot(self, super_bullet_vel):
+            if random.random() < 0.2:  # Adjust the probability based on difficulty
+                super_bullet_speed = super_bullet_vel  # Adjust speed based on difficulty
+                super_bullet = Laser(self.x + self.get_width() // 2 - self.super_laser_img.get_width() // 2,
+                                     self.y + self.get_height(), self.super_laser_img)
+                super_bullet.move(super_bullet_speed)
+                super_bullet.move(super_bullet_speed)
+                self.lasers.append(super_bullet)
 
         def health_bar(self, window):
             pygame.draw.rect(window, (255, 0, 0),
@@ -409,6 +438,8 @@ def play():
         while run:
             clock.tick(FPS)
             redraw_window()
+            shoot_chance = random.random()
+            bullet_chance = random.random()
 
             if lives <= 0 or player.health <= 0:
                 lost = True
@@ -465,8 +496,14 @@ def play():
             if boss:  # Handle boss movement and shooting
                 boss.move(parameters["boss_vel"])
                 boss.move_lasers(laser_vel, player)
-                if random.randrange(1, 2 * 30) == 1:
-                    boss.shoot()
+                print(f"Current shoot_chance: {shoot_chance}")
+                print(f"Current bullet_chance: {bullet_chance}")
+                print(parameters['special_bullet_vel'])
+                if shoot_chance < 0.50:
+                    if bullet_chance < 0.80:
+                        boss.shoot()
+                    else:
+                        boss.super_shoot(parameters['special_bullet_vel'])
 
                 if collide(boss, player):
                     player.health -= 10
@@ -481,11 +518,15 @@ def play():
                     powerups.remove(powerup)
                 elif powerup.collision(player):
                     if powerup.type == 'heart':
-                        player.health += 20
+                        if player.health > 100:
+                            break
+                        else:
+                            player.health += 20
                     elif powerup.type == 'speedup':
                         player_vel += 1
                     elif powerup.type == "cooldown":
-                        Player.COOLDOWN -= 5
+                        if Player.COOLDOWN >= 10:
+                            Player.COOLDOWN -= 2
                     elif powerup.type == 'upgrade':
                         evolve += 1
                         if evolve >= 3:
